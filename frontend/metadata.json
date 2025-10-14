@@ -1,0 +1,8 @@
+{
+  "name": "AgroLens",
+  "description": "A clean, modern farmer assistant dashboard called AgroLens, with an earthy green and brown color palette, showing crop disease detection results, treatment suggestions, weather forecast, and local mandi price predictions.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
