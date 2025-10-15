@@ -27,24 +27,28 @@ const DiseaseDetector: React.FC<DiseaseDetectorProps> = ({ t, language }) => {
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraAvailable, setCameraAvailable] = useState<boolean>(false);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isInitialMount = useRef(true);
 
-  // Check for camera availability on mount
   useEffect(() => {
     const checkForCamera = async () => {
       if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
-          const hasCamera = devices.some(device => device.kind === 'videoinput');
-          setCameraAvailable(hasCamera);
+          const videoInputs = devices.filter(device => device.kind === 'videoinput');
+          setVideoDevices(videoInputs);
+          setCameraAvailable(videoInputs.length > 0);
         } catch (err) {
-          console.error("Error checking for camera:", err);
+          console.error('Error checking for camera:', err);
+          setVideoDevices([]);
           setCameraAvailable(false);
         }
       } else {
+        setVideoDevices([]);
         setCameraAvailable(false);
       }
     };
@@ -164,13 +168,44 @@ const DiseaseDetector: React.FC<DiseaseDetectorProps> = ({ t, language }) => {
     }
   }, [closeCamera]);
 
-  const openCamera = async () => {
+  const openCamera = async (options?: { deviceId?: string; facing?: 'environment' | 'user' }) => {
+    // Try to open the back (environment) camera when available. Fallback to default camera.
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('No mediaDevices support');
+      }
+
+      // If a specific deviceId is provided, try that first
+      const tryConstraints: MediaStreamConstraints[] = [];
+      if (options?.deviceId) {
+        tryConstraints.push({ video: { deviceId: { exact: options.deviceId } } });
+      }
+
+      // Next try using facingMode preference
+      const facingToTry = options?.facing || cameraFacing || 'environment';
+      tryConstraints.push({ video: { facingMode: { exact: facingToTry } } });
+      tryConstraints.push({ video: { facingMode: { ideal: facingToTry } } });
+
+      // Finally, fallback to any camera
+      tryConstraints.push({ video: true });
+
+      let mediaStream: MediaStream | null = null;
+      for (const constraints of tryConstraints) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraints as MediaStreamConstraints);
+          if (mediaStream) break;
+        } catch (e) {
+          // try next constraint
+        }
+      }
+
+      if (!mediaStream) throw new Error('Could not access any camera');
+
       setStream(mediaStream);
       setIsCameraOpen(true);
     } catch (err) {
-      console.error("Error accessing camera: ", err);
+      console.error('Error accessing camera: ', err);
       let errorMessageKey = 'errorCameraGeneric';
       if (err instanceof Error) {
         if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
@@ -179,7 +214,23 @@ const DiseaseDetector: React.FC<DiseaseDetectorProps> = ({ t, language }) => {
           errorMessageKey = 'errorCameraPermission';
         }
       }
-      setError(t[errorMessageKey] || "Could not access camera.");
+      setError(t[errorMessageKey] || 'Could not access camera.');
+    }
+  };
+
+  // Toggle between front and back camera when camera is open
+  const toggleCameraFacing = async () => {
+    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(nextFacing);
+    // Restart camera with new facing preference
+    if (isCameraOpen) {
+      // stop current stream
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        setStream(null);
+      }
+      // Wait a tick then open camera with new facing
+      setTimeout(() => { openCamera({ facing: nextFacing }); }, 100);
     }
   };
 
@@ -266,6 +317,9 @@ const DiseaseDetector: React.FC<DiseaseDetectorProps> = ({ t, language }) => {
             </div>
             <div className="flex gap-4 mt-4">
               <button onClick={closeCamera} className="px-6 py-2 text-sm font-bold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">{t.cancel}</button>
+              <button onClick={toggleCameraFacing} className="px-4 py-2 text-sm font-semibold bg-gray-100 border rounded-md hover:bg-gray-200 transition-colors">
+                {cameraFacing === 'environment' ? 'Back' : 'Front'}
+              </button>
               <button onClick={handleCapture} className="px-8 py-2 text-sm font-bold text-white bg-brand-green rounded-md hover:bg-brand-green-dark transition-colors">{t.capture}</button>
             </div>
           </div>
