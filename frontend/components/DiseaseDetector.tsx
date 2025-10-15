@@ -317,8 +317,8 @@ const DiseaseDetector: React.FC<DiseaseDetectorProps> = ({ t, language }) => {
             </div>
             <div className="flex gap-4 mt-4">
               <button onClick={closeCamera} className="px-6 py-2 text-sm font-bold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">{t.cancel}</button>
-              <button onClick={toggleCameraFacing} className="px-4 py-2 text-sm font-semibold bg-gray-100 border rounded-md hover:bg-gray-200 transition-colors">
-                {cameraFacing === 'environment' ? 'Back' : 'Front'}
+              <button onClick={toggleCameraFacing} className="px-4 py-2 text-sm font-semibold bg-gray-100 border rounded-md hover:bg-gray-200 transition-colors" title={cameraFacing === 'environment' ? 'Switch to front camera' : 'Switch to back camera'}>
+                {cameraFacing === 'environment' ? 'Front' : 'Back'}
               </button>
               <button onClick={handleCapture} className="px-8 py-2 text-sm font-bold text-white bg-brand-green rounded-md hover:bg-brand-green-dark transition-colors">{t.capture}</button>
             </div>
